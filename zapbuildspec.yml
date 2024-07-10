@@ -1,0 +1,38 @@
+version: 0.2
+phases:
+ install:
+   commands:
+    # - apt update -y
+    # - apt -y install awscli
+     - echo "Install Stage completed"
+
+ pre_build:
+   commands:
+     - echo "stage pre_build completed"
+
+ build:
+   on-failure: ABORT
+   commands:
+     - /opt/zaproxy/zap.sh -cmd -quickurl https://qa-backend.non-prod.superiorcsgroup.com -quickprogress -quickout ~/owasp-scan-report.html
+     - mv ~/owasp-scan-report.html ~/owasp-scan-report`date +%d.%m.%Y-%H.%M`.html
+     - aws s3 cp ~/owasp-scan-report`date +%d.%m.%Y-%H.%M`.html s3://qa-devsecops-scan-reports/zapproxy-test-result/backend/
+     - medium_alert=$( grep -v "(Medium)" ~/owasp-scan-report`date +%d.%m.%Y-%H.%M`.html | sed -n /Medium/p | wc -l )
+     - high_alert=$( grep -v "(High)" ~/owasp-scan-report`date +%d.%m.%Y-%H.%M`.html | sed -n /High/p | wc -l )
+     - echo HighAlert $high_alert
+     - echo MediumAlert $medium_alert
+     - |
+        if [ $medium_alert -gt 0 ] || [ $high_alert -gt 0 ]; then
+         echo "there are high or medium alerts.. failing the build" &&
+         presigned_url_zaptest=$(aws s3 presign s3://qa-devsecops-scan-reports/zapproxy-test-result/backend/owasp-scan-report`date +%d.%m.%Y-%H.%M`.html --expires-in 43200)
+         aws sns publish --topic-arn arn:aws:sns:us-east-1:852827698164:qa-backend-devsecops-scan-reports-notification --message "DevSecops latest Zap-Penetration Test Scan report for QA backend has been uploaded to S3 bucket and is accessible using URL $presigned_url_zaptest" --region us-east-1
+        else
+         exit 0
+        fi
+
+ post_build:
+   commands:
+     - echo "ALL DONE"
+     
+artifacts:
+   files:
+     - '**/*'

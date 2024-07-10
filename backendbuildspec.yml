@@ -1,0 +1,37 @@
+version: 0.2
+env:
+  variables:
+     SECRET_ID: "arn:aws:secretsmanager:us-east-1:852827698164:secret:prod/onepercent-backend/-OSNldf"
+  secrets-manager:
+     env: prod/onepercent-backend/
+phases:
+  install:
+    commands:
+      - apt update -y
+      - apt-get remove nodejs -y
+      - rm -rf /usr/local/bin/npm 
+      - rm -rf /usr/local/share/man/man1/node* 
+      - rm -rf /usr/local/lib/dtrace/node.d
+      - rm -rf ~/.npm
+      - rm -rf ~/.node-gyp
+      - rm -rf /opt/local/bin/node
+      - rm -rf /opt/local/include/node
+      - rm -rf /opt/local/lib/node_modules
+      - rm -rf /usr/local/lib/node*
+      - rm -rf /usr/local/include/node*
+      - rm -rf /usr/local/bin/node*
+      - curl -sL https://deb.nodesource.com/setup_16.x | bash -
+      - cat /etc/apt/sources.list.d/nodesource.list
+      - sudo apt -y install nodejs
+      - node -v
+  build:
+    commands:
+      - echo Get Environment variables from AWS SECRETS MANAGER
+      - aws secretsmanager get-secret-value --secret-id $SECRET_ID --region us-east-1 --query SecretString --output text | jq -r 'to_entries[] | [.key, "=", "\"", .value, "\"" ]| @tsv' | tr -d "\t" > .env
+      - cat .env
+      - echo Installing source NPM dependencies...
+      - npm install
+      - npm install pm2 -g
+artifacts:
+    files:
+      - '**/*'

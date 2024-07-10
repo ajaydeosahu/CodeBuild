@@ -1,0 +1,33 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      # - apt update -y
+      # - apt install -y openjdk-11-jdk jq nodejs
+      - export SONAR_SCANNER_VERSION=4.7.0.2747
+      - export SONAR_SCANNER_HOME=$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux
+      - curl --create-dirs -sSLo $HOME/.sonar/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
+      - unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
+      - export PATH=$SONAR_SCANNER_HOME/bin:$PATH
+      - export SONAR_SCANNER_OPTS="-server"
+      - export SONAR_TOKEN=12345####6789
+
+    #- echo -e "#/bin/bash \n export PATH='$PATH:/opt/sonar-scanner/bin'" >> /etc/profile.d/sonar-scanner.sh
+    #- source /etc/profile.d/sonar-scanner.sh
+    #- sonar-scanner -v
+  build:
+    commands:
+      #- cd ../..
+      #- cd /codebuild/output/src*/src
+      #- sonar-scanner -Dsonar.projectKey=Test_Project -Dsonar.sources=. -Dsonar.host.url=http://13.232.164.32:9000  -Dsonar.login=84acfa305008ea2f70a3578fa5cb300b2b5acb67
+      - sonar-scanner -Dsonar.projectKey=Backend-dev -Dsonar.sources=. -Dsonar.host.url=https://sonar.zevbit.com/
+      - curl -o analysis.json -u "$SONAR_TOKEN:" https://sonar.zevbit.com/api/qualitygates/project_status?projectKey=Backend-dev --insecure
+      - project_status=$(jq -r '.projectStatus.status' analysis.json)
+      - echo PROJECTSTATUSIS $project_status
+      - |
+        if [ "$project_status" = "ERROR" ]; then
+          echo "Bugs found in the code"
+        else
+          echo "No bugs in the code"
+        fi
+
